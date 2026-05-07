@@ -4,5 +4,5 @@
 # Ignore python files
 .venv
 
-# Ignore test playgrounds
-test*.*
+# Ignore CSVs for now
+*.csv
