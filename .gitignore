@@ -3,3 +3,6 @@
 
 # Ignore python files
 .venv
+
+# Ignore test playgrounds
+test*.*
