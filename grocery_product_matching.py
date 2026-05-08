@@ -141,6 +141,8 @@ for i, row_a in enumerate(records_a):
     if score >= 0.90:
         final_matches.append((row_a["item_id"], candidate_b["item_id"]))
 
+    # TODO: maybe add LLM reasoning for lower threshold values - optimize implementation
+
 # DEBUG
 print(f"Total Matches Found: {len(final_matches)}")
 
