@@ -83,7 +83,7 @@ def create_embeddings(texts, batch_size=2000):
         batch = texts[i : i + batch_size]
         response = client.embeddings.create(
             input=batch, model="text-embedding-3-small"
-        )  # Ask if this is okay
+        )
         batch_embeddings = [x.embedding for x in response.data]
         embeddings.extend(batch_embeddings)
 
