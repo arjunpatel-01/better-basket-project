@@ -81,9 +81,7 @@ def create_embeddings(texts, batch_size=2000):
     embeddings = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
-        response = client.embeddings.create(
-            input=batch, model="text-embedding-3-small"
-        )
+        response = client.embeddings.create(input=batch, model="text-embedding-3-small")
         batch_embeddings = [x.embedding for x in response.data]
         embeddings.extend(batch_embeddings)
 
@@ -123,7 +121,7 @@ print("Vectorized datasets")
 
 # Prepare dataset b for similarity ranking and store
 index = faiss.IndexFlatIP(embeddings_b.shape[1])
-index.add(embeddings_b)  # this may require a second argument, double check
+index.add(embeddings_b)
 
 # Perform vector search
 similarities, indices = index.search(embeddings_a, k=1)
