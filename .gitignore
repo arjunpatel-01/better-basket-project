@@ -1,8 +1,11 @@
 # Ignore secrets
 *.yaml
 
-# Ignore python files
+# Ignore python environment files
 .venv
 
 # Ignore CSVs for now
 *.csv
+
+# Ignore template files
+*template.*
