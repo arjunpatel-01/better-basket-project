@@ -138,7 +138,7 @@ for i, row_a in enumerate(records_a):
     score = similarities[i][0]
     candidate_b = records_b[top_match_idx]
 
-    if score >= 0.80:
+    if score >= 0.90:
         final_matches.append((row_a["item_id"], candidate_b["item_id"]))
 
 # DEBUG
