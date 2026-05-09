@@ -202,14 +202,14 @@ if len(final_matches) < 4000:
 
         Respond ONLY with 'MATCH' or 'NO_MATCH'.
         """
-        try: 
+        try:
             response = client.chat.completions.create(
                 model=DEPLOYMENT_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.0,
             )
 
-            is_match = (response.choices[0].message.content.strip().upper() == 'MATCH')
+            is_match = response.choices[0].message.content.strip().upper() == "MATCH"
         except Exception as e:
             # DEBUG
             print(f"{e}")
