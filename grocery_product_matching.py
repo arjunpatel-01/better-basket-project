@@ -5,6 +5,7 @@ import re
 import json
 import numpy as np
 import faiss
+import os
 
 # Read the YAML file
 with open("openai_creds.yaml", "r") as file:
@@ -74,8 +75,18 @@ def build_relevant_data(row):
 
 
 # Define function for creating embeddings
-def create_embeddings(texts, batch_size=2000):
+def create_embeddings(texts, cache_file_path):
     """Creates embeddings in batches"""
+    # Retrieve from cache
+    cache_dir = "cache"
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_file = os.path.join(cache_dir, cache_file_path)
+
+    if os.path.exists(cache_file):
+        return np.load(cache_file)
+
+    # Generate embeddings
+    batch_size = 2000
     embeddings = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
@@ -86,7 +97,9 @@ def create_embeddings(texts, batch_size=2000):
         # DEBUG
         print(f"Batch {i}, embeddings: {len(embeddings)}")
 
-    return np.array(embeddings, dtype="float32")
+    embeddings = np.array(embeddings, dtype="float32")
+    np.save(cache_file, embeddings)
+    return embeddings
 
 
 # Read data
@@ -107,11 +120,15 @@ dataframe_b = pd.concat([dataframe_b, cleaned_b], axis=1)
 # DEBUG
 print("Cleaned datasets")
 
-# Vectorize both datasets
-embeddings_a = create_embeddings(dataframe_a["semantic_string"].tolist())
+# Retreive or generate embeddings for both datasets
+embeddings_a = create_embeddings(
+    dataframe_a["semantic_string"].tolist(), "embeddings_a.npy"
+)
 faiss.normalize_L2(embeddings_a)
 
-embeddings_b = create_embeddings(dataframe_b["semantic_string"].tolist())
+embeddings_b = create_embeddings(
+    dataframe_b["semantic_string"].tolist(), "embeddings_b.npy"
+)
 faiss.normalize_L2(embeddings_b)
 
 # DEBUG
