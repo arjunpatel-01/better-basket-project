@@ -211,6 +211,7 @@ if len(final_matches) < 4000:
 
             is_match = (response.choices[0].message.content.strip().upper() == 'MATCH')
         except Exception as e:
+            # DEBUG
             print(f"{e}")
             is_match = False
 
