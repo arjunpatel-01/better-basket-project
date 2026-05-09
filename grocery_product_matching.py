@@ -6,6 +6,7 @@ import json
 import numpy as np
 import faiss
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Read the YAML file
 with open("openai_creds.yaml", "r") as file:
@@ -143,6 +144,7 @@ similarities, indices = index.search(embeddings_a, k=1)
 
 # Build response structure
 final_matches = []
+llm_queries = []
 records_a = dataframe_a.to_dict("records")
 records_b = dataframe_b.to_dict("records")
 
@@ -156,10 +158,90 @@ for i, row_a in enumerate(records_a):
     if score >= 0.88:
         final_matches.append((row_a["item_id"], candidate_b["item_id"]))
 
-    # TODO: maybe add LLM reasoning for lower threshold values - optimize implementation
+    # Set aside "close enough" scores for LLM decision-making
+    elif score >= 0.85:
+        llm_queries.append({"score": score, "row_a": row_a, "candidate_b": candidate_b})
+
 
 # DEBUG
-print(f"Total Matches Found: {len(final_matches)}")
+print(f"Matches found by similarity search: {len(final_matches)}")
+# DEBUG
+print(f"Queries for the LLM: {len(llm_queries)}")
+
+# Handle ambiguity if not enough matches
+if len(final_matches) < 4000:
+    # Sort by score
+    llm_queries.sort(key=lambda x: x["score"], reverse=True)
+
+    # Helper for running LLM query
+    def evaluate_candidate(query):
+        row_a = query["row_a"]
+        candidate_b = query["candidate_b"]
+
+        # Generate appropriate prompt and run query
+        prompt = f"""
+        You are an expert grocery merchandiser. Determine if Product A is a direct, functional equivalent to Product B.
+        A match means a consumer would view these as the exact same substitute product, even if one is a private-label store brand and the other is a name brand.
+        
+        CRITICAL RULES:
+        1. The core product must be identical.
+        2. The sizes must be nearly identical. If explicit size is missing, look for weights/counts inside the product name.
+        3. Ignore brand differences if they are clearly private-label substitutes.
+        
+        Product A:
+        - Name: {row_a['clean_name']}
+        - Category: {row_a['clean_categories']}
+        - Size: {row_a['clean_size']}
+        - Description: {row_a['clean_description'][:200]}
+
+        Product B:
+        - Name: {candidate_b['clean_name']}
+        - Category: {candidate_b['clean_categories']}
+        - Size: {candidate_b['clean_size']}
+        - Description: {candidate_b['clean_description'][:200]}
+
+        Respond ONLY with 'MATCH' or 'NO_MATCH'.
+        """
+        try: 
+            response = client.chat.completions.create(
+                model=DEPLOYMENT_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.0,
+            )
+
+            is_match = (response.choices[0].message.content.strip().upper() == 'MATCH')
+        except Exception as e:
+            print(f"{e}")
+            is_match = False
+
+        return (
+            row_a["item_id"],
+            candidate_b["item_id"],
+            is_match,
+        )
+
+    # Multithread LLM requests
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        # Submit all queries to the executor
+        query_future = {
+            executor.submit(evaluate_candidate, query): query for query in llm_queries
+        }
+
+        # Process completed requests
+        for future in as_completed(query_future):
+            item_a, item_b, is_match = future.result()
+
+            if is_match:
+                final_matches.append((item_a, item_b))
+
+                # DEBUG
+                print(f"LLM match: {len(final_matches)}")
+            else:
+                # DEBUG
+                print(f"LLM non-match")
+
+# DEBUG
+print(f"Total matches found: {len(final_matches)}")
 
 # Export CSV
 matches_dataframe = pd.DataFrame(final_matches, columns=["item_id_A", "item_id_B"])
