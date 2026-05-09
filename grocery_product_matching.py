@@ -245,7 +245,7 @@ print(f"Total matches found: {len(final_matches)}")
 
 # Export CSV
 matches_dataframe = pd.DataFrame(final_matches, columns=["item_id_A", "item_id_B"])
-matches_dataframe.to_csv("private_label_equivalents.csv", index=False)
+matches_dataframe.to_csv("matches.csv", index=False)
 
 # DEBUG
-print("Saved to private_label_equivalents.csv")
+print("Saved to matches.csv")
