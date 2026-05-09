@@ -17,14 +17,8 @@ ENDPOINT = openai_creds["openai"]["endpoint"]
 API_KEY = openai_creds["openai"]["api_key"]
 DEPLOYMENT_NAME = openai_creds["openai"]["deployment_name"]
 
-# DEBUG
-print("Retrieved credentials")
-
 # Initialize the client
 client = OpenAI(base_url=ENDPOINT, api_key=API_KEY)
-
-# DEBUG
-print("Initialized client")
 
 
 # Define function for cleaning and parsing relevant data
@@ -86,7 +80,7 @@ def create_embeddings(texts, cache_file_path):
     if os.path.exists(cache_file):
         return np.load(cache_file)
 
-    # Generate embeddings
+    # Generate embeddings in batches
     batch_size = 2000
     embeddings = []
     for i in range(0, len(texts), batch_size):
@@ -94,9 +88,6 @@ def create_embeddings(texts, cache_file_path):
         response = client.embeddings.create(input=batch, model="text-embedding-3-small")
         batch_embeddings = [x.embedding for x in response.data]
         embeddings.extend(batch_embeddings)
-
-        # DEBUG
-        print(f"Batch {i}, embeddings: {len(embeddings)}")
 
     embeddings = np.array(embeddings, dtype="float32")
     np.save(cache_file, embeddings)
@@ -108,9 +99,6 @@ dtype_mapping = {"item_id": str, "tags": str, "raw_data_id": str}
 dataframe_a = pd.read_csv("grocery_store_a_items_final.csv", dtype=dtype_mapping)
 dataframe_b = pd.read_csv("grocery_store_b_items_final.csv", dtype=dtype_mapping)
 
-# DEBUG
-print("Read datasets")
-
 # Clean both datasets and overwrite with relevant data
 cleaned_a = dataframe_a.apply(build_relevant_data, axis=1)
 dataframe_a = pd.concat([dataframe_a, cleaned_a], axis=1)
@@ -118,10 +106,7 @@ dataframe_a = pd.concat([dataframe_a, cleaned_a], axis=1)
 cleaned_b = dataframe_b.apply(build_relevant_data, axis=1)
 dataframe_b = pd.concat([dataframe_b, cleaned_b], axis=1)
 
-# DEBUG
-print("Cleaned datasets")
-
-# Retreive or generate embeddings for both datasets
+# Get embeddings for both datasets
 embeddings_a = create_embeddings(
     dataframe_a["semantic_string"].tolist(), "embeddings_a.npy"
 )
@@ -131,9 +116,6 @@ embeddings_b = create_embeddings(
     dataframe_b["semantic_string"].tolist(), "embeddings_b.npy"
 )
 faiss.normalize_L2(embeddings_b)
-
-# DEBUG
-print("Vectorized datasets")
 
 # Prepare dataset b for similarity ranking and store
 index = faiss.IndexFlatIP(embeddings_b.shape[1])
@@ -155,18 +137,13 @@ for i, row_a in enumerate(records_a):
     score = similarities[i][0]
     candidate_b = records_b[top_match_idx]
 
+    # Set opinionated threshold
     if score >= 0.88:
         final_matches.append((row_a["item_id"], candidate_b["item_id"]))
 
-    # Set aside "close enough" scores for LLM decision-making
+    # Set aside "close enough" scores for LLM decision-making, also opinionated
     elif score >= 0.85:
         llm_queries.append({"score": score, "row_a": row_a, "candidate_b": candidate_b})
-
-
-# DEBUG
-print(f"Matches found by similarity search: {len(final_matches)}")
-# DEBUG
-print(f"Queries for the LLM: {len(llm_queries)}")
 
 # Handle ambiguity if not enough matches
 if len(final_matches) < 4000:
@@ -174,7 +151,7 @@ if len(final_matches) < 4000:
     llm_queries.sort(key=lambda x: x["score"], reverse=True)
 
     # Helper for running LLM query
-    def evaluate_candidate(query):
+    def determine_matches_via_llm(query):
         row_a = query["row_a"]
         candidate_b = query["candidate_b"]
 
@@ -211,8 +188,7 @@ if len(final_matches) < 4000:
 
             is_match = response.choices[0].message.content.strip().upper() == "MATCH"
         except Exception as e:
-            # DEBUG
-            print(f"{e}")
+            print(f"{e}")  # Debug
             is_match = False
 
         return (
@@ -223,9 +199,9 @@ if len(final_matches) < 4000:
 
     # Multithread LLM requests
     with ThreadPoolExecutor(max_workers=3) as executor:
-        # Submit all queries to the executor
+        # Submit all queries
         query_future = {
-            executor.submit(evaluate_candidate, query): query for query in llm_queries
+            executor.submit(determine_matches_via_llm, query): query for query in llm_queries
         }
 
         # Process completed requests
@@ -235,18 +211,10 @@ if len(final_matches) < 4000:
             if is_match:
                 final_matches.append((item_a, item_b))
 
-                # DEBUG
-                print(f"LLM match: {len(final_matches)}")
-            else:
-                # DEBUG
-                print(f"LLM non-match")
-
-# DEBUG
-print(f"Total matches found: {len(final_matches)}")
 
 # Export CSV
 matches_dataframe = pd.DataFrame(final_matches, columns=["item_id_A", "item_id_B"])
 matches_dataframe.to_csv("matches.csv", index=False)
 
-# DEBUG
+# Indicate success
 print("Saved to matches.csv")
