@@ -4,8 +4,8 @@
 # Ignore python environment files
 .venv
 
-# Ignore CSVs for now
-*.csv
+# Ignore datasets
+grocery_store*.csv
 
 # Ignore template files
 *template.*
