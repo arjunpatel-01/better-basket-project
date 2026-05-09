@@ -25,14 +25,7 @@ client = OpenAI(base_url=ENDPOINT, api_key=API_KEY)
 print("Initialized client")
 
 
-# Define functions for cleaning and parsing relevant data
-def strip_html(html):
-    """Strips HTML tags (reduce tokens)"""
-    if pd.isnull(html):
-        return ""
-    return re.sub(re.compile("<.*?>"), "", str(html)).strip()
-
-
+# Define function for cleaning and parsing relevant data
 def build_relevant_data(row):
     """Clean dataset and build relevant data for embeddings"""
     # Extract name
@@ -61,6 +54,11 @@ def build_relevant_data(row):
         except json.JSONDecodeError:
             pass
 
+    # Strip HTML from description
+    description = re.sub(
+        re.compile("<.*?>"), "", str(row.get("description", ""))
+    ).strip()
+
     # Determine string for vector store
     semantic_string = f"{categories_string} {name} {size}".strip().lower()
 
@@ -69,7 +67,7 @@ def build_relevant_data(row):
             "clean_name": name,
             "clean_categories": categories_string,
             "clean_size": size,
-            "clean_desc": strip_html(row.get("description", "")),
+            "clean_description": description,
             "semantic_string": semantic_string,
         }
     )
