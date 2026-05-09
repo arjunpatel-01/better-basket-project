@@ -9,3 +9,6 @@
 
 # Ignore template files
 *template.*
+
+# Ignore cache
+cache
