@@ -1,6 +1,6 @@
 # BetterBasket
 
-## Engineering Technical Assessment
+## Grocery Product Matching
 
 ### Background
 
